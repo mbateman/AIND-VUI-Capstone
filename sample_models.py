@@ -21,14 +21,16 @@ def simple_rnn_model(input_dim, output_dim=29):
 def rnn_model(input_dim, units, activation, output_dim=29):
     """ Build a recurrent network for speech 
     """
+    # Model 1: RNN + TimeDistributed Dense
+    # Adding batch normalization and a time distributed layer improves the loss by ~6x!
+    # Try different units here, SimpleRNN, LSTM, and GRU to see how their performance differs.
     # Main acoustic input
     input_data = Input(name='the_input', shape=(None, input_dim))
     # Add recurrent layer
-    simp_rnn = GRU(units, activation=activation,
-        return_sequences=True, implementation=2, name='rnn')(input_data)
-    # TODO: Add batch normalization 
+    simp_rnn = GRU(units, activation=activation, return_sequences=True, implementation=2, name='rnn')(input_data)
+    # Add batch normalization
     bn_rnn = BatchNormalization()(simp_rnn)
-    # TODO: Add a TimeDistributed(Dense(output_dim)) layer
+    # Add a TimeDistributed(Dense(output_dim)) layer
     time_dense = TimeDistributed(Dense(output_dim))(bn_rnn)
     # Add softmax activation layer
     y_pred = Activation('softmax', name='softmax')(time_dense)
@@ -38,11 +40,13 @@ def rnn_model(input_dim, units, activation, output_dim=29):
     print(model.summary())
     return model
 
-
 def cnn_rnn_model(input_dim, filters, kernel_size, conv_stride,
     conv_border_mode, units, output_dim=29):
     """ Build a recurrent + convolutional network for speech 
     """
+    # Model 2: CNN + RNN + TimeDistributed Dense
+    # These models are very powerful but have a tendency to severely overfit the data.
+    # You can add dropout to combat this.
     # Main acoustic input
     input_data = Input(name='the_input', shape=(None, input_dim))
     # Add convolutional layer
@@ -55,9 +59,11 @@ def cnn_rnn_model(input_dim, filters, kernel_size, conv_stride,
     bn_cnn = BatchNormalization(name='bn_conv_1d')(conv_1d)
     # Add a recurrent layer
     simp_rnn = SimpleRNN(units, activation='relu', return_sequences=True, implementation=2, name='rnn')(bn_cnn)
-    # TODO: Add batch normalization
+    # Add batch normalization
     bn_rnn = BatchNormalization()(simp_rnn)
-    # TODO: Add a TimeDistributed(Dense(output_dim)) layer
+    # add dropout layer
+    # dropout = Dropout(0.3)(bn_rnn)
+    # Add a TimeDistributed(Dense(output_dim)) layer
     time_dense = TimeDistributed(Dense(output_dim))(bn_rnn)
     # Add softmax activation layer
     y_pred = Activation('softmax', name='softmax')(time_dense)
@@ -92,17 +98,22 @@ def cnn_output_length(input_length, filter_size, border_mode, stride,
 def deep_rnn_model(input_dim, units, recur_layers, output_dim=29):
     """ Build a deep recurrent network for speech 
     """
+    # Model 3: Deeper RNN + TimeDistributed Dense
+    # Adding additional layers allows your network to capture more complex sequence representations,
+    # but also makes it more prone to overfitting. You can add dropout to combat this.
     # Main acoustic input
     input_data = Input(name='the_input', shape=(None, input_dim))
-    # TODO: Add recurrent layers, each with batch normalization
+    # Add recurrent layers, each with batch normalization
     rnn_input = input_data
+    dropout = Dropout(0.3)(rnn_input)
     for num in range(recur_layers):
         rnn_name = 'rnn_{}'.format(num)
-        simp_rnn = GRU(units, activation='relu', return_sequences=True, implementation=2, name=rnn_name)(rnn_input)
-        output = BatchNormalization()(simp_rnn)
+        simp_rnn = GRU(units, activation='relu', return_sequences=True, implementation=2, name=rnn_name)(dropout)
+        batch_norm = BatchNormalization()(simp_rnn)
+        dropout1 = Dropout(0.3)(batch_norm)
         # we set rnn_input to new output, thus allowing to chain rnn
-        rnn_input = output
-    # TODO: Add a TimeDistributed(Dense(output_dim)) layer
+        rnn_input = dropout1
+    # Add a TimeDistributed(Dense(output_dim)) layer
     time_dense = TimeDistributed(Dense(output_dim))(rnn_input)
     # Add softmax activation layer
     y_pred = Activation('softmax', name='softmax')(time_dense)
@@ -115,12 +126,15 @@ def deep_rnn_model(input_dim, units, recur_layers, output_dim=29):
 def bidirectional_rnn_model(input_dim, units, output_dim=29):
     """ Build a bidirectional recurrent network for speech
     """
+    # Model 4: Bidirectional RNN + TimeDistributed Dense
+    # These models tend to converge quickly.
+    # They take advantage of future information through the forward and backward processing of data.
     # Main acoustic input
     input_data = Input(name='the_input', shape=(None, input_dim))
-    # TODO: Add bidirectional recurrent layer
+    # Add bidirectional recurrent layer
     simp_rnn = GRU(units, activation='relu', return_sequences=True, implementation=2)
     bidir_rnn = Bidirectional(simp_rnn)(input_data)
-    # TODO: Add a TimeDistributed(Dense(output_dim)) layer
+    # Add a TimeDistributed(Dense(output_dim)) layer
     time_dense = TimeDistributed(Dense(output_dim)) (bidir_rnn)
     # Add softmax activation layer
     y_pred = Activation('softmax', name='softmax')(time_dense)
